@@ -8,7 +8,6 @@ import pandas as pd
 
 Candidate = namedtuple('Candidate', ['products', 'tidlist'])
 
-
 def read_and_convert_data(file_name: str):
     df = pd.read_csv(file_name, names=['transactions'])
     # Converting each row to numpy int array
@@ -99,20 +98,6 @@ def get_frequent_Lk(frequent_lk_1: List[List[int]], frequent_lk_1_tidlists: List
     return frequent_lk, frequent_lk_tidlists
 
 
-def generate_frequent_candidates(prev_frequent_candidates: dict, min_support: int):
-    sorted_keys = sorted(prev_frequent_candidates.keys())
-    candidates = dict()
-    for i in range(len(sorted_keys) - 1):
-        for j in range(i, len(sorted_keys) - 1):
-            assert i != j
-            candidate = sorted_keys[i] + " " + sorted_keys[i + 1]
-            first_tidlist = prev_frequent_candidates[sorted_keys[i]]
-            second_tidlist = prev_frequent_candidates[sorted_keys[i + 1]]
-            candidate_tidlist = first_tidlist & second_tidlist
-            if len(candidate_tidlist) > min_support:
-                candidates[candidate] = candidate_tidlist
-    return candidates
-
 
 def add_results(frequent_itemsets, frequent_candidates, frequent_candidates_tidlists):
     results = [(x, len(y)) for x, y in zip(frequent_candidates, frequent_candidates_tidlists)]
@@ -133,7 +118,7 @@ def get_frequent_candidates(candidates: dict, min_support):
 
 dataset = read_and_convert_data('data/BMS1_itemset_mining.txt')
 tidlists = get_tidlists(dataset)
-min_support = 100
+min_support = 50
 
 frequet_itemsets = eclat(dataset, min_support)
 pprint(frequet_itemsets)
