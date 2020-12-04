@@ -1,4 +1,5 @@
 from collections import namedtuple
+from itertools import combinations
 from time import time
 from typing import Tuple, List
 
@@ -8,10 +9,10 @@ import pandas as pd
 Candidate = namedtuple('Candidate', ['products', 'tidlist'])
 
 
-def read_and_convert_data(file_name: str):
+def read_and_convert_data(file_name: str, separator=' '):
     df = pd.read_csv(file_name, names=['transactions'])
     # Converting each row to numpy int array
-    df['transactions'] = df['transactions'].apply(lambda x: np.fromiter(map(int, x.split(' ')), dtype=np.int))
+    df['transactions'] = df['transactions'].apply(lambda x: np.fromstring(x, dtype=np.int, sep=separator))
 
     return df
 
@@ -115,12 +116,56 @@ def get_frequent_candidates(candidates: dict, min_support):
     return frequent_candidates
 
 
+def create_frequent_itemsets_index(frequent_itemset: List[Tuple[np.ndarray, int]]):
+    index = {}
+    for row in frequent_itemset:
+        for itemset_information in row:
+            index[np.array_str(itemset_information[0])] = itemset_information[1]
+
+    return index
+
+
+def not_empty_subsets_generator(a: np.ndarray):
+    length = len(a)
+    for i in range(1, length):
+        yield from combinations(a, r=i)
+
+
+def association_rule_generator(itemset: np.ndarray):
+    a_as_set = set(itemset)
+    for antecedent in not_empty_subsets_generator(itemset):
+        antecedent = set(antecedent)
+        consequent = a_as_set - antecedent
+
+        antecedent = np.array(list(antecedent), dtype=int)
+        consequent = np.array(list(consequent), dtype=int)
+        if antecedent.shape != ():
+            assert all(np.equal(antecedent, sorted(antecedent)))
+        if consequent.shape != ():
+            assert all(np.equal(consequent, sorted(consequent)))
+
+        yield antecedent, consequent
+
+
+def get_itemset_support(frequet_itemsets, itemset):
+    return frequet_itemsets[np.array_str(itemset)]
+
+
 time_start = time()
-
 dataset = read_and_convert_data('data/BMS1_itemset_mining.txt')
-tidlists = get_tidlists(dataset)
-min_support = 50
-
-frequet_itemsets = eclat(dataset, min_support)
 exec_time = time() - time_start
 print("exec time: {}".format(exec_time))
+
+min_support = 100
+
+frequet_itemsets = eclat(dataset, min_support)
+itemsets_index = create_frequent_itemsets_index(frequet_itemsets)
+print(frequet_itemsets[3][0][0])
+print(type(frequet_itemsets[3][0][0]))
+
+rule_generator = association_rule_generator(frequet_itemsets[3][0][0])
+first_ant, first_con = next(rule_generator)
+
+print("{} -> {}, supports: {}, {}".format(first_ant, first_con, get_itemset_support(itemsets_index, first_ant),
+                                          get_itemset_support(itemsets_index, first_con)))
+# TODO change way index are created for length 1 or change way ante or cons are created for length 1
