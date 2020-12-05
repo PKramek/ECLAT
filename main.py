@@ -51,7 +51,8 @@ def get_frequent_L1(tidlists: dict, min_support: int) -> Tuple[List[np.ndarray],
     sorted_keys = sorted(tidlists.keys())
     for key in sorted_keys:
         if len(tidlists[key]) > min_support:
-            frequent_l1.append(np.array(key))
+            # It must be a list for convenient retrieving support from index.
+            frequent_l1.append(np.array([key], dtype=int))
             frequent_l1_tidlists.append(np.array(tidlists[key]))
 
     return frequent_l1, frequent_l1_tidlists
@@ -65,8 +66,8 @@ def get_frequent_L2(frequent_l1: List[np.ndarray], frequent_l1_tidlists: List[np
         for j in range(i + 1, len(frequent_l1)):
             tidlist = np.intersect1d(frequent_l1_tidlists[i], frequent_l1_tidlists[j], assume_unique=True)
             if len(tidlist) > min_support:
-                first = frequent_l1[i]
-                second = frequent_l1[j]
+                first = frequent_l1[i][0]
+                second = frequent_l1[j][0]
                 frequent_l2.append(np.array([first, second]))
                 frequent_l2_tidlists.append(tidlist)
 
@@ -132,17 +133,13 @@ def not_empty_subsets_generator(a: np.ndarray):
 
 
 def association_rule_generator(itemset: np.ndarray):
-    a_as_set = set(itemset)
+    a_as_set = set(list(itemset))
     for antecedent in not_empty_subsets_generator(itemset):
         antecedent = set(antecedent)
         consequent = a_as_set - antecedent
 
-        antecedent = np.array(list(antecedent), dtype=int)
-        consequent = np.array(list(consequent), dtype=int)
-        if antecedent.shape != ():
-            assert all(np.equal(antecedent, sorted(antecedent)))
-        if consequent.shape != ():
-            assert all(np.equal(consequent, sorted(consequent)))
+        antecedent = np.sort(np.array(list(antecedent), dtype=int))
+        consequent = np.sort(np.array(list(consequent), dtype=int))
 
         yield antecedent, consequent
 
@@ -151,21 +148,24 @@ def get_itemset_support(frequet_itemsets, itemset):
     return frequet_itemsets[np.array_str(itemset)]
 
 
-time_start = time()
+def calculate_confidence(antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                         itemset_sup: int = None, antecedent_sup: int = None,
+                         consequent_sup: int = None):
+    pass
 dataset = read_and_convert_data('data/BMS1_itemset_mining.txt')
-exec_time = time() - time_start
-print("exec time: {}".format(exec_time))
 
-min_support = 100
+min_support = 50
 
 frequet_itemsets = eclat(dataset, min_support)
 itemsets_index = create_frequent_itemsets_index(frequet_itemsets)
-print(frequet_itemsets[3][0][0])
-print(type(frequet_itemsets[3][0][0]))
 
-rule_generator = association_rule_generator(frequet_itemsets[3][0][0])
-first_ant, first_con = next(rule_generator)
+time_start = time()
 
-print("{} -> {}, supports: {}, {}".format(first_ant, first_con, get_itemset_support(itemsets_index, first_ant),
-                                          get_itemset_support(itemsets_index, first_con)))
-# TODO change way index are created for length 1 or change way ante or cons are created for length 1
+for i in range(1, len(frequet_itemsets)):
+    for j in range(len(frequet_itemsets[i])):
+        itemset = frequet_itemsets[i][j][0]
+        for ant, con in association_rule_generator(itemset):
+            print("{} -> {}, supports: {}, {}".format(ant, con, get_itemset_support(itemsets_index, ant),
+                                                      get_itemset_support(itemsets_index, con)))
+exec_time = time() - time_start
+print("exec time: {}".format(exec_time))
