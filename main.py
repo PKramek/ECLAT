@@ -152,6 +152,8 @@ def calculate_confidence(antecedent: np.ndarray, consequent: np.ndarray, itemset
                          itemset_sup: int = None, antecedent_sup: int = None,
                          consequent_sup: int = None):
     pass
+
+
 dataset = read_and_convert_data('data/BMS1_itemset_mining.txt')
 
 min_support = 50
