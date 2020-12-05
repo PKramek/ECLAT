@@ -172,28 +172,10 @@ class Eclat:
     def calculate_confidence(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
                              antecedent_sup: int = None, consequent_sup: int = None, itemset_sup: int = None):
         assert self.frequent_itemsets_index is not None
-        assert isinstance(antecedent, np.ndarray)
-        assert isinstance(consequent, np.ndarray)
-        assert itemset is None or isinstance(itemset, np.ndarray)
 
-        if antecedent_sup is None:
-            antecedent_sup = self.get_itemset_support(antecedent)
-        else:
-            assert isinstance(antecedent_sup, int) and antecedent_sup > 0
-
-        if consequent_sup is None:
-            consequent_sup = self.get_itemset_support(consequent)
-        else:
-            assert isinstance(consequent_sup, int) and consequent_sup > 0
-
-        if itemset_sup is None:
-            if itemset is None:
-                itemset = np.sort(np.concatenate((antecedent, consequent)))
-
-            itemset_sup = self.get_itemset_support(itemset)
-        else:
-            if itemset_sup > consequent_sup or itemset_sup > antecedent_sup:
-                raise ValueError('Given itemset support is bigger than antecedent or consequent support')
+        antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
+            self._check_itemsets_and_supports(
+                antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         confidence = itemset_sup / float(antecedent_sup)
 
@@ -202,28 +184,10 @@ class Eclat:
     def calculate_cosine(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
                          antecedent_sup: int = None, consequent_sup: int = None, itemset_sup: int = None):
         assert self.frequent_itemsets_index is not None
-        assert isinstance(antecedent, np.ndarray)
-        assert isinstance(consequent, np.ndarray)
-        assert itemset is None or isinstance(itemset, np.ndarray)
 
-        if antecedent_sup is None:
-            antecedent_sup = self.get_itemset_support(antecedent)
-        else:
-            assert isinstance(antecedent_sup, int) and antecedent_sup > 0
-
-        if consequent_sup is None:
-            consequent_sup = self.get_itemset_support(consequent)
-        else:
-            assert isinstance(consequent_sup, int) and consequent_sup > 0
-
-        if itemset_sup is None:
-            if itemset is None:
-                itemset = np.sort(np.concatenate((antecedent, consequent)))
-
-            itemset_sup = self.get_itemset_support(itemset)
-        else:
-            if itemset_sup > consequent_sup or itemset_sup > antecedent_sup:
-                raise ValueError('Given itemset support is bigger than antecedent or consequent support')
+        antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
+            self._check_itemsets_and_supports(
+                antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         cosine = itemset_sup / float(sqrt(antecedent_sup * consequent_sup))
 
@@ -234,28 +198,10 @@ class Eclat:
                              consequent_sup: int = None, itemset_sup: int = None):
 
         assert self.frequent_itemsets_index is not None
-        assert isinstance(antecedent, np.ndarray)
-        assert isinstance(consequent, np.ndarray)
-        assert itemset is None or isinstance(itemset, np.ndarray)
 
-        if antecedent_sup is None:
-            antecedent_sup = self.get_itemset_support(antecedent)
-        else:
-            assert isinstance(antecedent_sup, int) and antecedent_sup > 0
-
-        if consequent_sup is None:
-            consequent_sup = self.get_itemset_support(consequent)
-        else:
-            assert isinstance(consequent_sup, int) and consequent_sup > 0
-
-        if itemset_sup is None:
-            if itemset is None:
-                itemset = np.sort(np.concatenate((antecedent, consequent)))
-
-            itemset_sup = self.get_itemset_support(itemset)
-        else:
-            if itemset_sup > consequent_sup or itemset_sup > antecedent_sup:
-                raise ValueError('Given itemset support is bigger than antecedent or consequent support')
+        antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
+            self._check_itemsets_and_supports(
+                antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         if confidence is None:
             confidence = self.calculate_confidence(
@@ -272,28 +218,10 @@ class Eclat:
                                    consequent_sup: int = None, itemset_sup: int = None):
 
         assert self.frequent_itemsets_index is not None
-        assert isinstance(antecedent, np.ndarray)
-        assert isinstance(consequent, np.ndarray)
-        assert itemset is None or isinstance(itemset, np.ndarray)
 
-        if antecedent_sup is None:
-            antecedent_sup = self.get_itemset_support(antecedent)
-        else:
-            assert isinstance(antecedent_sup, int) and antecedent_sup > 0
-
-        if consequent_sup is None:
-            consequent_sup = self.get_itemset_support(consequent)
-        else:
-            assert isinstance(consequent_sup, int) and consequent_sup > 0
-
-        if itemset_sup is None:
-            if itemset is None:
-                itemset = np.sort(np.concatenate((antecedent, consequent)))
-
-            itemset_sup = self.get_itemset_support(itemset)
-        else:
-            if itemset_sup > consequent_sup or itemset_sup > antecedent_sup:
-                raise ValueError('Given itemset support is bigger than antecedent or consequent support')
+        antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
+            self._check_itemsets_and_supports(
+                antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         if confidence is None:
             confidence = self.calculate_confidence(
