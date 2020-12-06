@@ -4,7 +4,7 @@ from Eclat.eclat import Eclat
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
-eclat = Eclat('data/data2.txt', min_support=0.0002, min_confidence=0.8)
+eclat = Eclat('data/BMS1_itemset_mining.txt', min_support=0.001, min_confidence=0.8)
 
 eclat.eclat()
 results_dataframe = eclat.get_results_dataframe()
