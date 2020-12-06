@@ -114,7 +114,8 @@ class Eclat:
         return frequent_lk, frequent_lk_tidlists
 
     def _add_results(self, frequent_itemsets, frequent_candidates, frequent_candidates_tidlists):
-        results = [(x, len(y)) for x, y in zip(frequent_candidates, frequent_candidates_tidlists)]
+        results = [(x, len(y) / self.num_of_transactions) for x, y in
+                   zip(frequent_candidates, frequent_candidates_tidlists)]
         frequent_itemsets.append(results)
 
         return frequent_itemsets
@@ -153,7 +154,7 @@ class Eclat:
         for i in range(1, length):
             yield from combinations(itemset, r=i)
 
-    def association_rule_generator(self, itemset: np.ndarray):
+    def _association_rule_generator(self, itemset: np.ndarray):
         assert isinstance(itemset, np.ndarray)
 
         a_as_set = set(list(itemset))
@@ -165,6 +166,43 @@ class Eclat:
             consequent = np.sort(np.array(list(consequent), dtype=int))
 
             yield antecedent, consequent
+
+    def association_rules_generator(self):
+        assert self.frequent_itemsets is not None
+
+        # not starting from 0 because association rules are only created from itemset of length of at least 2
+        for i in range(1, len(self.frequent_itemsets)):
+            for j in range(len(self.frequent_itemsets[i])):
+                itememset = self.frequent_itemsets[i][j][0]
+                for antecedent, consequent in self._association_rule_generator(itememset):
+                    yield antecedent, consequent, itememset
+
+    def frequent_association_rules_generator(
+            self, calc_cosine: bool, calc_conviction: bool, calc_certainty_factor: bool):
+
+        for antecedent, consequent, itemest in self.association_rules_generator():
+            antecedent_sup = self.get_itemset_support(antecedent)
+            consequent_sup = self.get_itemset_support(consequent)
+            itemset_sup = self.get_itemset_support(itemest)
+
+            confidence = self.calculate_confidence(
+                antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
+            cosine = None
+            conviction = None
+            certainty_factor = None
+
+            if confidence > self._min_confidence:
+                if calc_cosine:
+                    cosine = self.calculate_cosine(
+                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
+                if calc_conviction:
+                    conviction = self.calculate_conviction(
+                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
+                if calc_certainty_factor:
+                    certainty_factor = self.calculate_certainty_factor(
+                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
+
+                yield antecedent, consequent, confidence, cosine, conviction, certainty_factor
 
     def get_itemset_support(self, itemset):
         return self.frequent_itemsets_index[np.array_str(itemset)]
@@ -194,8 +232,8 @@ class Eclat:
         return cosine
 
     def calculate_conviction(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                             confidence: float = None, antecedent_sup: int = None,
-                             consequent_sup: int = None, itemset_sup: int = None):
+                             antecedent_sup: int = None, consequent_sup: int = None,
+                             itemset_sup: int = None, confidence: float = None):
 
         assert self.frequent_itemsets_index is not None
 
@@ -207,15 +245,18 @@ class Eclat:
             confidence = self.calculate_confidence(
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
         else:
-            assert isinstance(confidence, float) and 0 < confidence < 1
+            assert isinstance(confidence, float) and 0 <= confidence <= 1
 
-        conviction = (1 - consequent_sup) / float(1 - confidence)
+        if confidence == 1:
+            conviction = float('inf')
+        else:
+            conviction = (1 - consequent_sup) / float(1 - confidence)
 
         return conviction
 
     def calculate_certainty_factor(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                                   confidence: float = None, antecedent_sup: int = None,
-                                   consequent_sup: int = None, itemset_sup: int = None):
+                                   antecedent_sup: int = None, consequent_sup: int = None,
+                                   itemset_sup: int = None, confidence: float = None):
 
         assert self.frequent_itemsets_index is not None
 
@@ -227,9 +268,9 @@ class Eclat:
             confidence = self.calculate_confidence(
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
         else:
-            assert isinstance(confidence, float) and 0 < confidence < 1
+            assert isinstance(confidence, float) and 0 <= confidence <= 1
 
-        certainty_factor = (confidence - consequent_sup) / (self.num_of_transactions - consequent_sup)
+        certainty_factor = (confidence - consequent_sup) / (1 - consequent_sup)
 
         return certainty_factor
 
@@ -244,12 +285,12 @@ class Eclat:
         if antecedent_sup is None:
             antecedent_sup = self.get_itemset_support(antecedent)
         else:
-            assert isinstance(antecedent_sup, int) and antecedent_sup > 0
+            assert isinstance(antecedent_sup, float) and antecedent_sup > 0
 
         if consequent_sup is None:
             consequent_sup = self.get_itemset_support(consequent)
         else:
-            assert isinstance(consequent_sup, int) and consequent_sup > 0
+            assert isinstance(consequent_sup, float) and consequent_sup > 0
 
         if itemset_sup is None:
             if itemset is None:
@@ -265,5 +306,9 @@ class Eclat:
 
 eclat = Eclat('data/BMS1_itemset_mining.txt', min_support=50, min_confidence=0.5)
 eclat.eclat()
+frequent_association_rule_gen = eclat.frequent_association_rules_generator(
+    calc_cosine=True, calc_conviction=True, calc_certainty_factor=True)
 
-print(eclat.frequent_itemsets_index)
+for antecedant, consequent, confidence, cosine, conviction, certainty_factor in frequent_association_rule_gen:
+    print("{} -> {}, confidence: {:.3f}, cosine: {:.3f}, conviction: {:.3f}, certainty_factor: {:.3f}".format(
+        antecedant, consequent, confidence, cosine, conviction, certainty_factor))
