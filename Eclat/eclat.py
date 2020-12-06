@@ -1,9 +1,17 @@
+import logging
 from itertools import combinations
 from math import sqrt
 from typing import Tuple, List
 
 import numpy as np
 import pandas as pd
+
+
+class BinaryEncoder:
+    def __init__(self, num_of_transactions):
+        num_of_bits = num_of_transactions
+        bin_number = 0 << num_of_bits
+        print(bin_number)
 
 
 class Eclat:
@@ -44,19 +52,24 @@ class Eclat:
         self._min_confidence = min_confidence
 
     def eclat(self):
+        logging.info('min tidlist len: {}'.format(self.min_support * self.num_of_transactions))
         frequent_itemsets = []
 
         tidlists = self._get_tidlists()
         prev_frequent, prev_frequent_tidlists = self._get_frequent_L1(tidlists)
+        logging.info("Added L1, len = {}".format(len(prev_frequent)))
         self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
 
         prev_frequent, prev_frequent_tidlists = self._get_frequent_L2(prev_frequent, prev_frequent_tidlists)
 
         self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
-
+        logging.info("Added L2, len = {}".format(len(prev_frequent)))
+        i = 2
         while len(prev_frequent) >= 2:
             prev_frequent, prev_frequent_tidlists = self._get_frequent_Lk(prev_frequent, prev_frequent_tidlists)
             self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
+            i += 1
+            logging.info("Added L{}, len = {}".format(i, len(prev_frequent)))
 
         self.frequent_itemsets = frequent_itemsets
         self._create_frequent_itemsets_index()
@@ -192,6 +205,8 @@ class Eclat:
 
             confidence = self.calculate_confidence(
                 antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
+            lift = self.calculate_lift(
+                antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
             cosine = None
             conviction = None
             certainty_factor = None
@@ -207,7 +222,7 @@ class Eclat:
                     certainty_factor = self.calculate_certainty_factor(
                         antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
 
-                yield antecedent, consequent, confidence, cosine, conviction, certainty_factor
+                yield antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor
 
     def get_itemset_support(self, itemset):
         return self.frequent_itemsets_index[np.array_str(itemset)]
@@ -235,6 +250,26 @@ class Eclat:
         cosine = itemset_sup / float(sqrt(antecedent_sup * consequent_sup))
 
         return cosine
+
+    def calculate_lift(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                       antecedent_sup: int = None, consequent_sup: int = None,
+                       itemset_sup: int = None, confidence: float = None):
+
+        assert self.frequent_itemsets_index is not None
+
+        antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
+            self._check_itemsets_and_supports(
+                antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
+
+        if confidence is None:
+            confidence = self.calculate_confidence(
+                antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
+        else:
+            assert isinstance(confidence, float) and 0 <= confidence <= 1
+
+        lift = confidence / consequent_sup
+
+        return lift
 
     def calculate_conviction(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
                              antecedent_sup: int = None, consequent_sup: int = None,
@@ -313,38 +348,41 @@ class Eclat:
         frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics(
             calc_cosine=True, calc_conviction=True, calc_certainty_factor=True)
 
-        for antecedent, consequent, confidence, cosine, conviction, certainty_factor in frequent_association_rule_gen:
-            print("{} -> {}, confidence: {:.3f}, cosine: {:.3f}, conviction: {:.3f}, certainty_factor: {:.3f}".format(
-                antecedent, consequent, confidence, cosine, conviction, certainty_factor))
+        for antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor in frequent_association_rule_gen:
+            print(
+                "{} -> {}, confidence: {:.3f}, lift: {:.3f}, cosine: {:.3f}, conviction: {:.3f}, certainty_factor: {:.3f}".format(
+                    antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor))
 
     def _create_association_rules_dataframe(self):
         assert self.frequent_itemsets_index is not None
-
+        logging.info('Inside _create_association_rules_dataframe')
         antecedents = []
         consequents = []
         confidences = []
+        lifts = []
         cosines = []
         convictions = []
         certainty_factors = []
 
         frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics(
             calc_cosine=True, calc_conviction=True, calc_certainty_factor=True)
-        for antecedent, consequent, confidence, cosine, conviction, certainty_factor in frequent_association_rule_gen:
+        for antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor in frequent_association_rule_gen:
             antecedents.append(antecedent)
             consequents.append(consequent)
             confidences.append(confidence)
+            lifts.append(lift)
             cosines.append(cosine)
             convictions.append(conviction)
             certainty_factors.append(certainty_factor)
 
         results_dict = {
             'antecedent': antecedents, 'consequent': consequents,
-            'confidence': confidences, 'cosine': cosines,
+            'confidence': confidences, 'lift': lifts, 'cosine': cosines,
             'conviction': convictions, 'certainty_factor': certainty_factors
         }
         results_dataframe = pd.DataFrame(results_dict)
         self.results_dataframe = results_dataframe
-
+        logging.info('Finished _create_association_rules_dataframe')
         return results_dataframe
 
     def get_results_dataframe(self) -> pd.DataFrame:
@@ -379,3 +417,5 @@ class Eclat:
             self._create_association_rules_dataframe()
 
         self.results_dataframe.to_excel(file_name, index=False)
+
+# todo test speed if tidlists are converted to sets
