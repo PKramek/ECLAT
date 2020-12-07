@@ -59,6 +59,7 @@ class Eclat:
         prev_frequent, prev_frequent_tidlists = self._get_frequent_L1(tidlists)
         logging.info("Added L1, len = {}".format(len(prev_frequent)))
         self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
+        del tidlists
 
         prev_frequent, prev_frequent_tidlists = self._get_frequent_L2(prev_frequent, prev_frequent_tidlists)
 
@@ -85,7 +86,7 @@ class Eclat:
             if support > self.min_support:
                 # It must be a list for convenient retrieving support from index.
                 frequent_l1.append(np.array([key], dtype=int))
-                frequent_l1_tidlists.append(np.array(tidlists[key]))
+                frequent_l1_tidlists.append(tidlists[key])
 
         return frequent_l1, frequent_l1_tidlists
 
@@ -95,7 +96,7 @@ class Eclat:
 
         for i in range(len(frequent_l1) - 1):
             for j in range(i + 1, len(frequent_l1)):
-                tidlist = np.intersect1d(frequent_l1_tidlists[i], frequent_l1_tidlists[j], assume_unique=True)
+                tidlist = frequent_l1_tidlists[i] & frequent_l1_tidlists[j]
                 support = len(tidlist) / self.num_of_transactions
                 if support > self.min_support:
                     first = frequent_l1[i][0]
@@ -112,16 +113,11 @@ class Eclat:
 
         for i in range(len(frequent_lk_1) - 1):
             for j in range(i + 1, len(frequent_lk_1_tidlists)):
-
-                first_except_last_item = np.delete(frequent_lk_1[i], itemset_len - 1)
-                second_except_last_item = np.delete(frequent_lk_1[j], itemset_len - 1)
-                first_last = frequent_lk_1[i][itemset_len - 1]
-                second_last = frequent_lk_1[j][itemset_len - 1]
-
-                if first_last != second_last and all(np.equal(first_except_last_item, second_except_last_item)):
-                    tidlist = np.intersect1d(frequent_lk_1_tidlists[i], frequent_lk_1_tidlists[j], assume_unique=True)
+                if self._only_last_different(frequent_lk_1[i], frequent_lk_1[j]):
+                    tidlist = frequent_lk_1_tidlists[i] & frequent_lk_1_tidlists[j]
                     support = len(tidlist) / self.num_of_transactions
                     if support > self.min_support:
+                        second_last = frequent_lk_1[j][itemset_len - 1]
                         new_candidate_itemset = np.append(np.copy(frequent_lk_1[i]), second_last)
 
                         frequent_lk.append(new_candidate_itemset)
@@ -130,6 +126,12 @@ class Eclat:
                     break
 
         return frequent_lk, frequent_lk_tidlists
+
+    def _only_last_different(self, first: np.ndarray, second: np.ndarray):
+        num_of_equals = np.count_nonzero(np.equal(first, second))
+        length = len(first)
+
+        return num_of_equals == len(first) - 1 and first[length - 1] != second[length - 1]
 
     def _add_results(self, frequent_itemsets, frequent_candidates, frequent_candidates_tidlists):
         results = [(x, len(y) / self.num_of_transactions) for x, y in
@@ -152,7 +154,7 @@ class Eclat:
 
         for index, row in self.dataset.iterrows():
             for product in row['transactions']:
-                tidlists.setdefault(product, []).append(index)
+                tidlists.setdefault(product, set()).add(index)
 
         return tidlists
 
