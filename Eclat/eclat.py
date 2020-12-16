@@ -7,13 +7,6 @@ import numpy as np
 import pandas as pd
 
 
-class BinaryEncoder:
-    def __init__(self, num_of_transactions):
-        num_of_bits = num_of_transactions
-        bin_number = 0 << num_of_bits
-        print(bin_number)
-
-
 class Eclat:
     def __init__(self, dataset_path: str, min_support: float, min_confidence: float, separator: str = ' '):
         assert isinstance(dataset_path, str)
