@@ -8,16 +8,14 @@ import pandas as pd
 
 
 class Eclat:
-    def __init__(self, dataset_path: str, min_support: float, min_confidence: float, separator: str = ' '):
+    def __init__(self, dataset_path: str, min_support: float, separator: str = ' '):
         assert isinstance(dataset_path, str)
 
         self.dataset = None
         self.frequent_itemsets = None
-        self.frequent_itemsets_index = None
         self.num_of_transactions = None
 
         self.min_support = min_support
-        self.min_confidence = min_confidence
 
         self.read_and_convert_data(dataset_path, separator)
 
@@ -33,16 +31,8 @@ class Eclat:
             raise ValueError("Minimal support must be integer bigger than 1")
         self._min_support = min_support
 
-    @property
-    def min_confidence(self):
-        return self._min_confidence
-
-    @min_confidence.setter
-    def min_confidence(self, min_confidence: float):
-        if not isinstance(min_confidence, float) or not 0 < min_confidence < 1:
-            raise ValueError("Minimal confidence must be floating point number in interval (0, 1)")
-
-        self._min_confidence = min_confidence
+    def get_frequent_itemsets(self):
+        return self.eclat()
 
     def eclat(self):
         logging.info('min tidlist len: {}'.format(self.min_support * self.num_of_transactions))
@@ -66,7 +56,6 @@ class Eclat:
             logging.info("Added L{}, len = {}".format(i, len(prev_frequent)))
 
         self.frequent_itemsets = frequent_itemsets
-        self._create_frequent_itemsets_index()
         return frequent_itemsets
 
     def _get_frequent_L1(self, tidlists: dict) -> Tuple[List[np.ndarray], List[np.ndarray]]:
@@ -152,12 +141,101 @@ class Eclat:
         return tidlists
 
     def read_and_convert_data(self, dataset_path: str, separator: str):
-        # TODO raise exceptions
         df = pd.read_csv(dataset_path, names=['transactions'])
         # Converting each row to numpy int array
         df['transactions'] = df['transactions'].apply(lambda x: np.fromstring(x, dtype=np.int, sep=separator))
         self.dataset = df
         self.num_of_transactions = self.dataset.shape[0]
+
+
+class AssociationRulesGenerator:
+    ECLAT = 'ECLAT'
+
+    def __init__(self, algorithm: str, dataset_path: str, min_support: float,
+                 min_confidence: float, separator: str = ' ',
+                 cosine: bool = True, certainty_f: bool = True, conviction: bool = True):
+        assert isinstance(dataset_path, str)
+        algorithms_lookup = {self.ECLAT: Eclat}
+        algorithm = algorithms_lookup.get(algorithm, None)
+
+        if algorithm is None:
+            raise ValueError('Not know algorithm')
+
+        self.algorithm = algorithm(dataset_path, min_support, separator)
+        self.min_confidence = min_confidence
+
+        self.frequent_itemsets = None
+        self.frequent_itemsets_index = None
+        self.results_dataframe = None
+
+        self.calc_cosine = cosine
+        self.calc_certainty_f = certainty_f
+        self.calc_conviction = conviction
+
+    @property
+    def min_confidence(self):
+        return self._min_confidence
+
+    @min_confidence.setter
+    def min_confidence(self, min_confidence: float):
+        if not isinstance(min_confidence, float) or not 0 < min_confidence < 1:
+            raise ValueError("Minimal confidence must be floating point number in interval (0, 1)")
+
+        self._min_confidence = min_confidence
+
+    def find_rules(self):
+        self.frequent_itemsets = self.algorithm.get_frequent_itemsets()
+        self._create_frequent_itemsets_index()
+        return self._create_association_rules_dataframe()
+
+    def _create_frequent_itemsets_index(self) -> None:
+        assert self.frequent_itemsets is not None
+        index = {}
+        for row in self.frequent_itemsets:
+            for itemset_information in row:
+                index[np.array_str(itemset_information[0])] = itemset_information[1]
+
+        self.frequent_itemsets_index = index
+
+    def _create_association_rules_dataframe(self):
+        assert self.frequent_itemsets_index is not None
+        logging.info('Inside _create_association_rules_dataframe')
+        antecedents = []
+        consequents = []
+        confidences = []
+        lifts = []
+        cosines = []
+        convictions = []
+        certainty_factors = []
+
+        frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics()
+        for antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor in frequent_association_rule_gen:
+            antecedents.append(antecedent)
+            consequents.append(consequent)
+            confidences.append(confidence)
+            lifts.append(lift)
+            if self.calc_cosine:
+                cosines.append(cosine)
+            if self.calc_conviction:
+                convictions.append(conviction)
+            if self.calc_certainty_f:
+                certainty_factors.append(certainty_factor)
+
+        results_dict = {
+            'antecedent': antecedents, 'consequent': consequents,
+            'confidence': confidences, 'lift': lifts
+        }
+        if self.calc_cosine:
+            results_dict['cosine'] = cosines
+        if self.calc_conviction:
+            results_dict['conviction'] = convictions
+        if self.calc_certainty_f:
+            results_dict['certainty_factor'] = certainty_factors
+
+        results_dataframe = pd.DataFrame(results_dict)
+        self.results_dataframe = results_dataframe
+        logging.info('Finished _create_association_rules_dataframe')
+        return results_dataframe
 
     @staticmethod
     def not_empty_subsets_generator(itemset: np.ndarray):
@@ -190,8 +268,7 @@ class Eclat:
                 for antecedent, consequent in self._association_rule_generator(itememset):
                     yield antecedent, consequent, itememset
 
-    def frequent_association_rules_generator_with_metrics(
-            self, calc_cosine: bool, calc_conviction: bool, calc_certainty_factor: bool):
+    def frequent_association_rules_generator_with_metrics(self):
 
         for antecedent, consequent, itemest in self.association_rules_generator():
             antecedent_sup = self.get_itemset_support(antecedent)
@@ -207,13 +284,13 @@ class Eclat:
             certainty_factor = None
 
             if confidence > self._min_confidence:
-                if calc_cosine:
+                if self.calc_cosine:
                     cosine = self.calculate_cosine(
                         antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
-                if calc_conviction:
+                if self.calc_conviction:
                     conviction = self.calculate_conviction(
                         antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
-                if calc_certainty_factor:
+                if self.calc_certainty_f:
                     certainty_factor = self.calculate_certainty_factor(
                         antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
 
@@ -338,6 +415,12 @@ class Eclat:
 
         return antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup
 
+    def get_results_dataframe(self) -> pd.DataFrame:
+        if self.results_dataframe is None:
+            self._create_association_rules_dataframe()
+
+        return self.results_dataframe
+
     def print_results_to_console(self):
         assert self.frequent_itemsets_index is not None
         frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics(
@@ -347,44 +430,6 @@ class Eclat:
             print(
                 "{} -> {}, confidence: {:.3f}, lift: {:.3f}, cosine: {:.3f}, conviction: {:.3f}, certainty_factor: {:.3f}".format(
                     antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor))
-
-    def _create_association_rules_dataframe(self):
-        assert self.frequent_itemsets_index is not None
-        logging.info('Inside _create_association_rules_dataframe')
-        antecedents = []
-        consequents = []
-        confidences = []
-        lifts = []
-        cosines = []
-        convictions = []
-        certainty_factors = []
-
-        frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics(
-            calc_cosine=True, calc_conviction=True, calc_certainty_factor=True)
-        for antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor in frequent_association_rule_gen:
-            antecedents.append(antecedent)
-            consequents.append(consequent)
-            confidences.append(confidence)
-            lifts.append(lift)
-            cosines.append(cosine)
-            convictions.append(conviction)
-            certainty_factors.append(certainty_factor)
-
-        results_dict = {
-            'antecedent': antecedents, 'consequent': consequents,
-            'confidence': confidences, 'lift': lifts, 'cosine': cosines,
-            'conviction': convictions, 'certainty_factor': certainty_factors
-        }
-        results_dataframe = pd.DataFrame(results_dict)
-        self.results_dataframe = results_dataframe
-        logging.info('Finished _create_association_rules_dataframe')
-        return results_dataframe
-
-    def get_results_dataframe(self) -> pd.DataFrame:
-        if self.results_dataframe is None:
-            self._create_association_rules_dataframe()
-
-        return self.results_dataframe
 
     def save_results_to_csv(self, file_name: str):
         assert self.frequent_itemsets_index is not None
@@ -412,5 +457,3 @@ class Eclat:
             self._create_association_rules_dataframe()
 
         self.results_dataframe.to_excel(file_name, index=False)
-
-# todo test speed if tidlists are converted to sets
