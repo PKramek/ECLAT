@@ -14,12 +14,11 @@ class Eclat:
         self.dataset = None
         self.frequent_itemsets = None
         self.num_of_transactions = None
+        self.results_dataframe = None
 
         self.min_support = min_support
 
         self.read_and_convert_data(dataset_path, separator)
-
-        self.results_dataframe = None
 
     @property
     def min_support(self):
@@ -28,86 +27,86 @@ class Eclat:
     @min_support.setter
     def min_support(self, min_support: float):
         if not isinstance(min_support, float) or not (0 <= min_support <= 1):
-            raise ValueError("Minimal support must be integer bigger than 1")
+            raise ValueError("Minimal support must be float in interval [0, 1]")
         self._min_support = min_support
 
     def get_frequent_itemsets(self):
         return self.eclat()
 
     def eclat(self):
-        logging.info('min tidlist len: {}'.format(self.min_support * self.num_of_transactions))
+        logging.debug('min tidlist len: {}'.format(int(self.min_support * self.num_of_transactions)))
         frequent_itemsets = []
 
         tidlists = self._get_tidlists()
-        prev_frequent, prev_frequent_tidlists = self._get_frequent_L1(tidlists)
-        logging.info("Added L1, len = {}".format(len(prev_frequent)))
+        prev_frequent, prev_frequent_tidlists = self._get_frequent_1_itemsets(tidlists)
+        logging.debug("Added L1, len = {}".format(len(prev_frequent)))
         self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
         del tidlists
 
-        prev_frequent, prev_frequent_tidlists = self._get_frequent_L2(prev_frequent, prev_frequent_tidlists)
+        prev_frequent, prev_frequent_tidlists = self._get_frequent_2_itemsets(prev_frequent, prev_frequent_tidlists)
 
         self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
-        logging.info("Added L2, len = {}".format(len(prev_frequent)))
+        logging.debug("Added L2, number of itemsets: {}".format(len(prev_frequent)))
         i = 2
         while len(prev_frequent) >= 2:
             prev_frequent, prev_frequent_tidlists = self._get_frequent_Lk(prev_frequent, prev_frequent_tidlists)
             self._add_results(frequent_itemsets, prev_frequent, prev_frequent_tidlists)
             i += 1
-            logging.info("Added L{}, len = {}".format(i, len(prev_frequent)))
+            logging.debug("Added L{}, number of itemsets = {}".format(i, len(prev_frequent)))
 
         self.frequent_itemsets = frequent_itemsets
         return frequent_itemsets
 
-    def _get_frequent_L1(self, tidlists: dict) -> Tuple[List[np.ndarray], List[np.ndarray]]:
-        frequent_l1 = []
-        frequent_l1_tidlists = []
+    def _get_frequent_1_itemsets(self, tidlists: dict) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+        frequent_1 = []
+        frequent_1_tidlists = []
 
         sorted_keys = sorted(tidlists.keys())
         for key in sorted_keys:
             support = len(tidlists[key]) / self.num_of_transactions
             if support > self.min_support:
                 # It must be a list for convenient retrieving support from index.
-                frequent_l1.append(np.array([key], dtype=int))
-                frequent_l1_tidlists.append(tidlists[key])
+                frequent_1.append(np.array([key], dtype=int))
+                frequent_1_tidlists.append(tidlists[key])
 
-        return frequent_l1, frequent_l1_tidlists
+        return frequent_1, frequent_1_tidlists
 
-    def _get_frequent_L2(self, frequent_l1: List[np.ndarray], frequent_l1_tidlists: List[np.ndarray]):
-        frequent_l2 = []
-        frequent_l2_tidlists = []
+    def _get_frequent_2_itemsets(self, frequent_1: List[np.ndarray], frequent_1_tidlists: List[np.ndarray]):
+        frequent_2 = []
+        frequent_2_tidlists = []
 
-        for i in range(len(frequent_l1) - 1):
-            for j in range(i + 1, len(frequent_l1)):
-                tidlist = frequent_l1_tidlists[i] & frequent_l1_tidlists[j]
+        for i in range(len(frequent_1) - 1):
+            for j in range(i + 1, len(frequent_1)):
+                tidlist = frequent_1_tidlists[i] & frequent_1_tidlists[j]
                 support = len(tidlist) / self.num_of_transactions
                 if support > self.min_support:
-                    first = frequent_l1[i][0]
-                    second = frequent_l1[j][0]
-                    frequent_l2.append(np.array([first, second]))
-                    frequent_l2_tidlists.append(tidlist)
+                    first = frequent_1[i][0]
+                    second = frequent_1[j][0]
+                    frequent_2.append(np.array([first, second]))
+                    frequent_2_tidlists.append(tidlist)
 
-        return frequent_l2, frequent_l2_tidlists
+        return frequent_2, frequent_2_tidlists
 
-    def _get_frequent_Lk(self, frequent_lk_1: List[np.ndarray], frequent_lk_1_tidlists: List[np.array]):
-        frequent_lk = []
-        frequent_lk_tidlists = []
-        itemset_len = len(frequent_lk_1[0])
+    def _get_frequent_Lk(self, frequent_k_1: List[np.ndarray], frequent_k_1_tidlists: List[np.array]):
+        frequent_k = []
+        frequent_k_tidlists = []
+        itemset_len = len(frequent_k_1[0])
 
-        for i in range(len(frequent_lk_1) - 1):
-            for j in range(i + 1, len(frequent_lk_1_tidlists)):
-                if self._only_last_different(frequent_lk_1[i], frequent_lk_1[j]):
-                    tidlist = frequent_lk_1_tidlists[i] & frequent_lk_1_tidlists[j]
+        for i in range(len(frequent_k_1) - 1):
+            for j in range(i + 1, len(frequent_k_1_tidlists)):
+                if self._only_last_different(frequent_k_1[i], frequent_k_1[j]):
+                    tidlist = frequent_k_1_tidlists[i] & frequent_k_1_tidlists[j]
                     support = len(tidlist) / self.num_of_transactions
                     if support > self.min_support:
-                        second_last = frequent_lk_1[j][itemset_len - 1]
-                        new_candidate_itemset = np.append(np.copy(frequent_lk_1[i]), second_last)
+                        second_last = frequent_k_1[j][itemset_len - 1]
+                        new_candidate_itemset = np.append(np.copy(frequent_k_1[i]), second_last)
 
-                        frequent_lk.append(new_candidate_itemset)
-                        frequent_lk_tidlists.append(tidlist)
+                        frequent_k.append(new_candidate_itemset)
+                        frequent_k_tidlists.append(tidlist)
                 else:
                     break
 
-        return frequent_lk, frequent_lk_tidlists
+        return frequent_k, frequent_k_tidlists
 
     def _only_last_different(self, first: np.ndarray, second: np.ndarray):
         num_of_equals = np.count_nonzero(np.equal(first, second))
@@ -184,7 +183,9 @@ class AssociationRulesGenerator:
         self._min_confidence = min_confidence
 
     def find_rules(self):
+        logging.info('Finding frequent itemsets...')
         self.frequent_itemsets = self.algorithm.get_frequent_itemsets()
+        logging.info('Indexing frequent itemsets...')
         self._create_frequent_itemsets_index()
         return self._create_association_rules_dataframe()
 
@@ -199,7 +200,7 @@ class AssociationRulesGenerator:
 
     def _create_association_rules_dataframe(self):
         assert self.frequent_itemsets_index is not None
-        logging.info('Inside _create_association_rules_dataframe')
+        logging.info('Creating association rules...')
         antecedents = []
         consequents = []
         confidences = []
@@ -208,7 +209,7 @@ class AssociationRulesGenerator:
         convictions = []
         certainty_factors = []
 
-        frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics()
+        frequent_association_rule_gen = self._frequent_association_rules_generator_with_metrics()
         for antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor in frequent_association_rule_gen:
             antecedents.append(antecedent)
             consequents.append(consequent)
@@ -234,31 +235,46 @@ class AssociationRulesGenerator:
 
         results_dataframe = pd.DataFrame(results_dict)
         self.results_dataframe = results_dataframe
-        logging.info('Finished _create_association_rules_dataframe')
+        logging.info('Association rules created...')
         return results_dataframe
 
     @staticmethod
-    def not_empty_subsets_generator(itemset: np.ndarray):
+    def _not_empty_subsets_generator(itemset: np.ndarray):
         assert isinstance(itemset, np.ndarray)
 
         length = len(itemset)
         for i in range(1, length):
             yield from combinations(itemset, r=i)
 
-    def _association_rule_generator(self, itemset: np.ndarray):
-        assert isinstance(itemset, np.ndarray)
+    def _frequent_association_rules_generator_with_metrics(self):
 
-        a_as_set = set(list(itemset))
-        for antecedent in self.not_empty_subsets_generator(itemset):
-            antecedent = set(antecedent)
-            consequent = a_as_set - antecedent
+        for antecedent, consequent, itemest in self._association_rules_generator():
+            antecedent_sup = self._get_itemset_support(antecedent)
+            consequent_sup = self._get_itemset_support(consequent)
+            itemset_sup = self._get_itemset_support(itemest)
 
-            antecedent = np.sort(np.array(list(antecedent), dtype=int))
-            consequent = np.sort(np.array(list(consequent), dtype=int))
+            confidence = self._calculate_confidence(
+                antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
+            lift = self._calculate_lift(
+                antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
+            cosine = None
+            conviction = None
+            certainty_factor = None
 
-            yield antecedent, consequent
+            if confidence > self._min_confidence:
+                if self.calc_cosine:
+                    cosine = self._calculate_cosine(
+                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
+                if self.calc_conviction:
+                    conviction = self._calculate_conviction(
+                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
+                if self.calc_certainty_f:
+                    certainty_factor = self._calculate_certainty_factor(
+                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
 
-    def association_rules_generator(self):
+                yield antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor
+
+    def _association_rules_generator(self):
         assert self.frequent_itemsets is not None
 
         # not starting from 0 because association rules are only created from itemset of length of at least 2
@@ -268,39 +284,24 @@ class AssociationRulesGenerator:
                 for antecedent, consequent in self._association_rule_generator(itememset):
                     yield antecedent, consequent, itememset
 
-    def frequent_association_rules_generator_with_metrics(self):
+    def _association_rule_generator(self, itemset: np.ndarray):
+        assert isinstance(itemset, np.ndarray)
 
-        for antecedent, consequent, itemest in self.association_rules_generator():
-            antecedent_sup = self.get_itemset_support(antecedent)
-            consequent_sup = self.get_itemset_support(consequent)
-            itemset_sup = self.get_itemset_support(itemest)
+        a_as_set = set(list(itemset))
+        for antecedent in self._not_empty_subsets_generator(itemset):
+            antecedent = set(antecedent)
+            consequent = a_as_set - antecedent
 
-            confidence = self.calculate_confidence(
-                antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
-            lift = self.calculate_lift(
-                antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
-            cosine = None
-            conviction = None
-            certainty_factor = None
+            antecedent = np.sort(np.array(list(antecedent), dtype=int))
+            consequent = np.sort(np.array(list(consequent), dtype=int))
 
-            if confidence > self._min_confidence:
-                if self.calc_cosine:
-                    cosine = self.calculate_cosine(
-                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup)
-                if self.calc_conviction:
-                    conviction = self.calculate_conviction(
-                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
-                if self.calc_certainty_f:
-                    certainty_factor = self.calculate_certainty_factor(
-                        antecedent, consequent, itemest, antecedent_sup, consequent_sup, itemset_sup, confidence)
+            yield antecedent, consequent
 
-                yield antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor
-
-    def get_itemset_support(self, itemset):
+    def _get_itemset_support(self, itemset) -> int:
         return self.frequent_itemsets_index[np.array_str(itemset)]
 
-    def calculate_confidence(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                             antecedent_sup: int = None, consequent_sup: int = None, itemset_sup: int = None):
+    def _calculate_confidence(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                              antecedent_sup: int = None, consequent_sup: int = None, itemset_sup: int = None) -> float:
         assert self.frequent_itemsets_index is not None
 
         antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
@@ -311,8 +312,8 @@ class AssociationRulesGenerator:
 
         return confidence
 
-    def calculate_cosine(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                         antecedent_sup: int = None, consequent_sup: int = None, itemset_sup: int = None):
+    def _calculate_cosine(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                          antecedent_sup: int = None, consequent_sup: int = None, itemset_sup: int = None) -> float:
         assert self.frequent_itemsets_index is not None
 
         antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup = \
@@ -323,9 +324,9 @@ class AssociationRulesGenerator:
 
         return cosine
 
-    def calculate_lift(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                       antecedent_sup: int = None, consequent_sup: int = None,
-                       itemset_sup: int = None, confidence: float = None):
+    def _calculate_lift(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                        antecedent_sup: int = None, consequent_sup: int = None,
+                        itemset_sup: int = None, confidence: float = None) -> float:
 
         assert self.frequent_itemsets_index is not None
 
@@ -334,7 +335,7 @@ class AssociationRulesGenerator:
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         if confidence is None:
-            confidence = self.calculate_confidence(
+            confidence = self._calculate_confidence(
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
         else:
             assert isinstance(confidence, float) and 0 <= confidence <= 1
@@ -343,9 +344,9 @@ class AssociationRulesGenerator:
 
         return lift
 
-    def calculate_conviction(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                             antecedent_sup: int = None, consequent_sup: int = None,
-                             itemset_sup: int = None, confidence: float = None):
+    def _calculate_conviction(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                              antecedent_sup: int = None, consequent_sup: int = None,
+                              itemset_sup: int = None, confidence: float = None) -> float:
 
         assert self.frequent_itemsets_index is not None
 
@@ -354,7 +355,7 @@ class AssociationRulesGenerator:
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         if confidence is None:
-            confidence = self.calculate_confidence(
+            confidence = self._calculate_confidence(
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
         else:
             assert isinstance(confidence, float) and 0 <= confidence <= 1
@@ -366,9 +367,9 @@ class AssociationRulesGenerator:
 
         return conviction
 
-    def calculate_certainty_factor(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
-                                   antecedent_sup: int = None, consequent_sup: int = None,
-                                   itemset_sup: int = None, confidence: float = None):
+    def _calculate_certainty_factor(self, antecedent: np.ndarray, consequent: np.ndarray, itemset: np.ndarray = None,
+                                    antecedent_sup: int = None, consequent_sup: int = None,
+                                    itemset_sup: int = None, confidence: float = None) -> float:
 
         assert self.frequent_itemsets_index is not None
 
@@ -377,7 +378,7 @@ class AssociationRulesGenerator:
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
 
         if confidence is None:
-            confidence = self.calculate_confidence(
+            confidence = self._calculate_confidence(
                 antecedent, consequent, itemset, antecedent_sup, consequent_sup, itemset_sup)
         else:
             assert isinstance(confidence, float) and 0 <= confidence <= 1
@@ -395,12 +396,12 @@ class AssociationRulesGenerator:
         assert itemset is None or isinstance(itemset, np.ndarray)
 
         if antecedent_sup is None:
-            antecedent_sup = self.get_itemset_support(antecedent)
+            antecedent_sup = self._get_itemset_support(antecedent)
         else:
             assert isinstance(antecedent_sup, float) and antecedent_sup > 0
 
         if consequent_sup is None:
-            consequent_sup = self.get_itemset_support(consequent)
+            consequent_sup = self._get_itemset_support(consequent)
         else:
             assert isinstance(consequent_sup, float) and consequent_sup > 0
 
@@ -408,7 +409,7 @@ class AssociationRulesGenerator:
             if itemset is None:
                 itemset = np.sort(np.concatenate((antecedent, consequent)))
 
-            itemset_sup = self.get_itemset_support(itemset)
+            itemset_sup = self._get_itemset_support(itemset)
         else:
             if itemset_sup > consequent_sup or itemset_sup > antecedent_sup:
                 raise ValueError('Given itemset support is bigger than antecedent or consequent support')
@@ -423,8 +424,7 @@ class AssociationRulesGenerator:
 
     def print_results_to_console(self):
         assert self.frequent_itemsets_index is not None
-        frequent_association_rule_gen = self.frequent_association_rules_generator_with_metrics(
-            calc_cosine=True, calc_conviction=True, calc_certainty_factor=True)
+        frequent_association_rule_gen = self._frequent_association_rules_generator_with_metrics()
 
         for antecedent, consequent, confidence, lift, cosine, conviction, certainty_factor in frequent_association_rule_gen:
             print(
@@ -434,6 +434,7 @@ class AssociationRulesGenerator:
     def save_results_to_csv(self, file_name: str):
         assert self.frequent_itemsets_index is not None
         assert isinstance(file_name, str)
+        logging.info('Saving results to csv file...')
 
         if self.results_dataframe is None:
             self._create_association_rules_dataframe()
@@ -443,6 +444,7 @@ class AssociationRulesGenerator:
     def save_results_to_json(self, file_name: str, orient: str = 'index'):
         assert self.frequent_itemsets_index is not None
         assert isinstance(file_name, str)
+        logging.info('Saving results to json file...')
 
         if self.results_dataframe is None:
             self._create_association_rules_dataframe()
@@ -452,6 +454,7 @@ class AssociationRulesGenerator:
     def save_results_to_excel(self, file_name: str):
         assert self.frequent_itemsets_index is not None
         assert isinstance(file_name, str)
+        logging.info('Saving results to excel file...')
 
         if self.results_dataframe is None:
             self._create_association_rules_dataframe()

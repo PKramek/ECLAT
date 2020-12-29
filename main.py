@@ -1,24 +1,30 @@
 import argparse
 import logging
+from time import time
 
 import matplotlib.pyplot as plt
 
 from AssociationRules.association_rules import AssociationRulesGenerator
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
-
-# EXAMPLE how to call
+# Example way of run this program
 a = "python main.py -m_conf 0.95 -m_supp 0.001 --path ./data/BMS1_itemset_mining.txt -csv ./results/results_testing.csv"
 
 
 def graph_metric(results_df, metric: str):
-    metrics_color_lookup = {'cosine': 'r', 'certainty_factor': 'blue', 'conviction': 'g'}
-    metric_lookup = {'cosine': results_df.cosine,
-                     'certainty_factor': results_df.certainty_factor,
-                     'conviction': results_df.conviction}
-    y_label_lookup = {'cosine': 'Cosine value',
-                      'certainty_factor': 'Certainty factor value',
-                      'conviction': 'Conviction value'}
+    metrics_color_lookup = {
+        'cosine': 'r',
+        'certainty_factor': 'blue',
+        'conviction': 'g'}
+
+    metric_lookup = {
+        'cosine': results_df.cosine,
+        'certainty_factor': results_df.certainty_factor,
+        'conviction': results_df.conviction}
+
+    y_label_lookup = {
+        'cosine': 'Cosine value',
+        'certainty_factor': 'Certainty factor value',
+        'conviction': 'Conviction value'}
 
     assert metric in metrics_color_lookup.keys()
     plt.scatter(results_df.lift, metric_lookup[metric], c=metrics_color_lookup[metric], s=5, alpha=0.6)
@@ -36,11 +42,11 @@ parser.add_argument('-p', '--path', type=str, required=True, help='Path to file 
 parser.add_argument('--cosine', type=bool, default=True, help='Should cosine metric be calculated')
 parser.add_argument('--conviction', type=bool, default=True, help='Should conviction metric be calculated')
 parser.add_argument('--certainty_f', type=bool, default=True, help='Should certainty factor metric be calculated')
-parser.add_argument('--cosine_graph', type=bool, default=True,
+parser.add_argument('--cosine_graph', type=bool, default=False,
                     help='Should cosine metric be graphed in respect to lift metric')
-parser.add_argument('--conviction_graph', type=bool, default=True,
+parser.add_argument('--conviction_graph', type=bool, default=False,
                     help='Should conviction metric be graphed in respect to lift metric')
-parser.add_argument('--certainty_f_graph', type=bool, default=True,
+parser.add_argument('--certainty_f_graph', type=bool, default=False,
                     help='Should certainty factor metric be graphed in respect to lift metric')
 parser.add_argument('-csv', '--csv_output', type=str, default=None,
                     help='Path to csv file in which output will be saved')
@@ -50,9 +56,22 @@ parser.add_argument('-json', '--json_output', type=str, default=None,
                     help='Path to json file in which output will be saved')
 parser.add_argument('-print', '--print_to_console', type=bool, default=False,
                     help='Should found rules be printed to console')
+parser.add_argument('-log', '--logging', type=str, default='Info', choices=['Info', 'Debug', 'None'],
+                    help='Should logs be printed to console, Debug level not recommended while creating graphs.')
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    if args.logging != 'None':
+        log_format = '%(asctime)s - %(message)s'
+        if args.logging == 'Info':
+            logging.basicConfig(level=logging.INFO, format=log_format)
+        elif args.logging == 'Debug':
+            logging.basicConfig(level=logging.DEBUG, format=log_format)
+        else:
+            raise ValueError('Not known type level of logging.')
+
+    start_time = time()
 
     association_rules_generator = AssociationRulesGenerator(
         AssociationRulesGenerator.ECLAT, args.path,
@@ -79,3 +98,5 @@ if __name__ == '__main__':
 
     if args.certainty_f_graph:
         graph_metric(results_dataframe, 'certainty_factor')
+
+    logging.info('Execution time: {}'.format(time() - start_time))
