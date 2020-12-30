@@ -31,10 +31,7 @@ class Eclat:
         self._min_support = min_support
 
     def get_frequent_itemsets(self):
-        return self.eclat()
-
-    def eclat(self):
-        logging.debug('min tidlist len: {}'.format(int(self.min_support * self.num_of_transactions)))
+        logging.info('min tidlist len: {}'.format(int(self.min_support * self.num_of_transactions)))
         frequent_itemsets = []
 
         tidlists = self._get_tidlists()
