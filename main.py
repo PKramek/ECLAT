@@ -3,7 +3,6 @@ import logging
 from time import time
 
 import matplotlib.pyplot as plt
-import numpy  as np
 
 from AssociationRules.association_rules import AssociationRulesGenerator
 
