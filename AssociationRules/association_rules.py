@@ -277,22 +277,18 @@ class AssociationRulesGenerator:
         # not starting from 0 because association rules are only created from itemset of length of at least 2
         for i in range(1, len(self.frequent_itemsets)):
             for j in range(len(self.frequent_itemsets[i])):
-                itememset = self.frequent_itemsets[i][j][0]
-                for antecedent, consequent in self._association_rule_generator(itememset):
-                    yield antecedent, consequent, itememset
+                itemset = self.frequent_itemsets[i][j][0]
+                itemset_as_set = set(list(itemset))
 
-    def _association_rule_generator(self, itemset: np.ndarray):
-        assert isinstance(itemset, np.ndarray)
+                for antecedent in self._not_empty_subsets_generator(itemset):
+                    antecedent = set(antecedent)
+                    consequent = itemset_as_set - antecedent
 
-        a_as_set = set(list(itemset))
-        for antecedent in self._not_empty_subsets_generator(itemset):
-            antecedent = set(antecedent)
-            consequent = a_as_set - antecedent
+                    antecedent = np.sort(np.array(list(antecedent), dtype=int))
+                    consequent = np.sort(np.array(list(consequent), dtype=int))
 
-            antecedent = np.sort(np.array(list(antecedent), dtype=int))
-            consequent = np.sort(np.array(list(consequent), dtype=int))
+                    yield antecedent, consequent, itemset
 
-            yield antecedent, consequent
 
     def _get_itemset_support(self, itemset) -> int:
         return self.frequent_itemsets_index[np.array_str(itemset)]

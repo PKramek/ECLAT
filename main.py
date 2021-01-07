@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from AssociationRules.association_rules import AssociationRulesGenerator
 
-# Example way of run this program
+# Example how to run this program
 a = "python main.py -m_conf 0.95 -m_supp 0.001 --path ./data/BMS1_itemset_mining.txt -csv ./results/results_testing.csv"
 
 
@@ -36,8 +36,9 @@ def graph_metric(results_df, metric: str):
 
 parser = argparse.ArgumentParser(description='Find association rules in data set')
 parser.add_argument('-m_conf', '--min_confidence', type=float, required=True,
-                    help='Minimal association rule confidence')
-parser.add_argument('-m_supp', '--min_support', type=float, required=True, help='Minimal frequent itemset support')
+                    help='Minimal association rule confidence, should be a value in interval [0,1]')
+parser.add_argument('-m_supp', '--min_support', type=float, required=True,
+                    help='Minimal frequent itemset support, , should be a value in interval [0,1]')
 parser.add_argument('-p', '--path', type=str, required=True, help='Path to file containing dataset')
 parser.add_argument('--cosine', type=bool, default=True, help='Should cosine metric be calculated')
 parser.add_argument('--conviction', type=bool, default=True, help='Should conviction metric be calculated')
