@@ -104,7 +104,7 @@ class Eclat:
         return frequent_k, frequent_k_tidlists
 
     def _only_last_different(self, first: np.ndarray, second: np.ndarray):
-        num_of_equals = np.count_nonzero(np.equal(first, second))
+        num_of_equals = np.sum(np.equal(first, second))
         length = len(first)
 
         return num_of_equals == len(first) - 1 and first[length - 1] != second[length - 1]
