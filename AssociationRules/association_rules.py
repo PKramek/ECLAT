@@ -118,14 +118,6 @@ class Eclat:
 
         return frequent_itemsets
 
-    def _create_frequent_itemsets_index(self) -> None:
-        index = {}
-        for row in self.frequent_itemsets:
-            for itemset_information in row:
-                index[np.array_str(itemset_information[0])] = itemset_information[1]
-
-        self.frequent_itemsets_index = index
-
     def _get_tidlists(self) -> dict:
         assert self.dataset is not None
         tidlists = dict()
@@ -288,7 +280,6 @@ class AssociationRulesGenerator:
                     consequent = np.sort(np.array(list(consequent), dtype=int))
 
                     yield antecedent, consequent, itemset
-
 
     def _get_itemset_support(self, itemset) -> int:
         return self.frequent_itemsets_index[np.array_str(itemset)]
