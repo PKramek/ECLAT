@@ -34,20 +34,20 @@ def graph_metric(results_df, metric: str):
     plt.show()
 
 
-parser = argparse.ArgumentParser(description='Find association rules in data set')
+parser = argparse.ArgumentParser(prog="Eclat", description='Find association rules in data set')
 parser.add_argument('-m_conf', '--min_confidence', type=float, required=True,
                     help='Minimal association rule confidence, should be a value in interval [0,1]')
 parser.add_argument('-m_supp', '--min_support', type=float, required=True,
                     help='Minimal frequent itemset support, , should be a value in interval [0,1]')
 parser.add_argument('-p', '--path', type=str, required=True, help='Path to file containing dataset')
-parser.add_argument('--cosine', type=bool, default=True, help='Should cosine metric be calculated')
-parser.add_argument('--conviction', type=bool, default=True, help='Should conviction metric be calculated')
-parser.add_argument('--certainty_f', type=bool, default=True, help='Should certainty factor metric be calculated')
-parser.add_argument('--cosine_graph', type=bool, default=False,
+parser.add_argument('--no-cosine', action='store_true', help='Should cosine metric be calculated')
+parser.add_argument('--no-conviction', action='store_true', help='Should conviction metric be calculated')
+parser.add_argument('--no-certainty_f', action='store_true', help='Should certainty factor metric be calculated')
+parser.add_argument('--cosine_graph', action='store_true',
                     help='Should cosine metric be graphed in respect to lift metric')
-parser.add_argument('--conviction_graph', type=bool, default=False,
+parser.add_argument('--conviction_graph', action='store_true',
                     help='Should conviction metric be graphed in respect to lift metric')
-parser.add_argument('--certainty_f_graph', type=bool, default=False,
+parser.add_argument('--certainty_f_graph', action='store_true',
                     help='Should certainty factor metric be graphed in respect to lift metric')
 parser.add_argument('-csv', '--csv_output', type=str, default=None,
                     help='Path to csv file in which output will be saved')
@@ -55,7 +55,7 @@ parser.add_argument('-excel', '--excel_output', type=str, default=None,
                     help='Path to excel file in which output will be saved')
 parser.add_argument('-json', '--json_output', type=str, default=None,
                     help='Path to json file in which output will be saved')
-parser.add_argument('-print', '--print_to_console', type=bool, default=False,
+parser.add_argument('-print', '--print_to_console', action='store_true',
                     help='Should found rules be printed to console')
 parser.add_argument('-log', '--logging', type=str, default='Info', choices=['Info', 'Debug', 'None'],
                     help='Should logs be printed to console, Debug level not recommended while creating graphs.')
@@ -72,12 +72,24 @@ if __name__ == '__main__':
         else:
             raise ValueError('Not known type level of logging.')
 
+    if args.cosine_graph:
+        if args.no_cosine:
+            raise AttributeError('Can not graph cosine without calculating it first')
+
+    if args.conviction_graph:
+        if args.no_conviction:
+            raise AttributeError('Can not graph conviction without calculating it first')
+
+    if args.certainty_f_graph:
+        if args.no_certainty_f:
+            raise AttributeError('Can not graph certainty factor without calculating it first')
+
     start_time = time()
 
     association_rules_generator = AssociationRulesGenerator(
         AssociationRulesGenerator.ECLAT, args.path,
         min_support=args.min_support, min_confidence=args.min_confidence,
-        cosine=args.cosine, certainty_f=args.certainty_f, conviction=args.conviction)
+        cosine=not args.no_cosine, certainty_f=not args.no_certainty_f, conviction=not args.no_conviction)
 
     results_dataframe = association_rules_generator.find_rules()
 
